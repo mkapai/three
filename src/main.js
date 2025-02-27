@@ -3,7 +3,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import Stats from 'three/addons/libs/stats.module.js';
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(95, window.innerWidth / window.innerHeight, 0.1, 10000);
+const camera = new THREE.PerspectiveCamera(95, window.innerWidth / window.innerHeight, 0.1, 1000000);
 const renderer = new THREE.WebGLRenderer({alpha: true,antialias:true});
 const stats = new Stats();
 document.body.appendChild(stats.domElement);
@@ -40,7 +40,7 @@ var Bullet = function(start_position,s_velocity,init_velocity,direction,ballisti
   this.end = false;
   scene.add(this.mesh);
   //this.last_time = new Date().getTime();
-
+  this.arrow = [];
 
   this.UpdateProjectile = (time)=>{
     //console.log(time);
@@ -58,31 +58,35 @@ var Bullet = function(start_position,s_velocity,init_velocity,direction,ballisti
     this.dist = this.mesh.position.distanceTo(this.init_position);
 
 
-    const dir = this.velocity.clone().normalize();
-      const arrow = new THREE.ArrowHelper(
+    var dir = this.velocity.clone().normalize();
+    var arrow = new THREE.ArrowHelper(
         dir,
         this.mesh.position.clone(),
         5,
         0xff00ff
       );
       scene.add(arrow);
+      this.arrow.push(arrow);
   };
 
   this.update = ()=>{
     if(this.end){
       //绘制记录点
-     
+      
       return;
     }
     //判断当前位置的Y轴是否小于0 是就删除 运行距离是否长于1000
     if(this.mesh.position.y < 0 || this.dist > 10000){
-      scene.remove(this.mesh);
       this.end = true;
     }
-    //更新弹丸位置
-    //var time = (new Date().getTime() - this.last_time) / 1000;
     this.UpdateProjectile(1/96);
 
+  };
+  this.remove = ()=>{
+    scene.remove(this.mesh);
+    for(var i = 0; i < this.arrow.length; i++){
+      scene.remove(this.arrow[i]);
+    }
   };
 };
 
@@ -133,6 +137,7 @@ var AirPlane = function() {
 
   //根据速度和加速度推算飞机的下一个位置
   this.update = ()=>{
+    this.propeller.rotation.x += 0.1;
     var out_pos = new THREE.Vector3();
     var out_vel = new THREE.Vector3();
     //todo::尝试画出圆心轨迹
@@ -140,9 +145,74 @@ var AirPlane = function() {
     this.mesh.position.copy(out_pos);
     this.velocity.copy(out_vel);
   };
+  this.remove = ()=>{
+    //scene.remove(this.mesh);
+  }
 };
+//新建一个弹丸管理器,管理并更新所有弹丸
+var BulletManager = function(){
+  this.bullets = [];
+  this.Update = ()=>{
+    for(var i = 0;i<this.bullets.length;i++){
+      this.bullets[i].update();
+    }
+  };
+  //创建弹丸
+  this.CreateBullet = (start_position,velocity,init_velocity,direction,ballistic_coeff)=>{
+    var bullet = new Bullet(start_position,velocity,init_velocity,direction,ballistic_coeff);
+    this.bullets.push(bullet);  
+  }
+  //删除最先创建的弹丸
+  this.DeleteBullet = ()=>{
+
+    var buller = this.bullets.shift();
+    if(buller){
+      buller.remove();
+    } 
+  }
+  //监听键盘事件小键盘1键删除一个弹丸 2键创建一个弹丸
+  window.addEventListener("keydown",(e)=>{
+    if(e.key === "1"){
+      this.DeleteBullet();
+    }
+    if(e.key === "2"){
+      //创建弹丸 需要一些参数 如何让用户输入?
+      this.CreateBullet(airplane.mesh.position,airplane.velocity,300,new THREE.Vector3(0.5,0.3,0.2),-0.0002);
+    }
+  });
+};
+var bulletManager = new BulletManager();
+//新建一个飞机管理器,管理并更新所有飞机
+var AirPlaneManager = function(){
+  this.airplanes = [];
+  this.Update = ()=>{
+    for(var i = 0;i<this.airplanes.length;i++){
+      this.airplanes[i].update();
+    }
+  };
+  //创建飞机
+  this.CreateAirPlane = (position,velocity,acceleration)=>{
+    var airplane = new AirPlane();
+    airplane.mesh.position.copy(position);
+    airplane.velocity.copy(velocity);
+    airplane.acceleration.copy(acceleration);
+    this.airplanes.push(airplane);
+    scene.add(airplane.mesh);
+    return airplane;
+  }
+  //删除最先创建的飞机
+  this.DeleteAirPlane = ()=>{
+    var air = this.airplanes.shift();
+    if(air){
+      scene.remove(air.mesh); 
+      air.remove();
+    }
+  }
 
 
+
+}
+var airplaneManager = new AirPlaneManager();
 
 function createLights() {
   var hemisphereLight = new THREE.HemisphereLight(0xaaaaaa,0x000000, .9)
@@ -160,7 +230,7 @@ camera.position.z = 200;
 camera.position.y = 100;
 
 const axesHelper = new THREE.AxesHelper(15000);
-const gridHelper  = new THREE.GridHelper(1500,50);
+const gridHelper  = new THREE.GridHelper(15000,50);
 
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -172,28 +242,24 @@ createLights();
 const geometry = new THREE.BoxGeometry();
 const material = new THREE.MeshBasicMaterial({ alpha: true,transparent:true,opacity:0.5});
 const cube = new THREE.Mesh(geometry, material);
-var airplane = new AirPlane();
-var airplane2 = new AirPlane();
 
+
+//创建飞行物
+var airplane = airplaneManager.CreateAirPlane(new THREE.Vector3(0,100,0),new THREE.Vector3(1,0,0),new THREE.Vector3(0,0,0));
+var airplane2 = airplaneManager.CreateAirPlane(new THREE.Vector3(1000,136,1000),new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0));
 airplane.mesh.scale.set(.25,.25,.25);
-airplane.mesh.position.y = 100;
-
-
-airplane2.mesh.position.x = 1000;
-airplane2.mesh.position.y = 100;
-airplane2.mesh.position.z = 1000;
 airplane2.mesh.scale.set(.25,.25,.25);
-airplane2.velocity = new THREE.Vector3(152,-32,169);
-airplane2.acceleration = new THREE.Vector3(-1,20,-10);
 
 
-scene.add(airplane2.mesh);
-scene.add(airplane.mesh);
+//创建弹丸
+bulletManager.CreateBullet(airplane.mesh.position,airplane.velocity,300,new THREE.Vector3(0.5,0.3,0.2),-0.0002);
+
+
+
 scene.add(cube);
 scene.add(axesHelper);
 scene.add(gridHelper);
 
-var bullets = new Bullet(airplane.mesh.position,new THREE.Vector3(152,-32,169),300,new THREE.Vector3(0.5,0.3,0.2),-0.0002);
 window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -203,11 +269,10 @@ window.addEventListener("resize", () => {
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
-  bullets.update();
-
-  airplane2.update();
+  bulletManager.Update();
+  airplaneManager.Update();
   stats.update();
-  airplane.propeller.rotation.x += 0.3;
+  
   renderer.render(scene, camera);
 }
 animate();
