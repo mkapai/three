@@ -249,6 +249,9 @@ var BulletManager = function(){
       console.log(myinfo);
       this.CreateBullet(myinfo.position,myinfo.velocity,myinfo.init_velocity,myinfo.direction,myinfo.ballistic_coeff);
     }
+    if(e.key === "3"){
+      //可能击中目标的方式
+    }
   });
 };
 
