@@ -36,6 +36,18 @@ folder.add(myinfo.direction, 'x' );
 folder.add(myinfo.direction, 'y' );
 folder.add(myinfo.direction, 'z' );
 var targetgui = gui.addFolder('TargetInfo');
+folder = targetgui.addFolder('Position');
+folder.add(targetinfo.position, 'x' );
+folder.add(targetinfo.position, 'y' );
+folder.add(targetinfo.position, 'z' );
+folder = targetgui.addFolder('velocity');
+folder.add(targetinfo.velocity, 'x' );
+folder.add(targetinfo.velocity, 'y' );
+folder.add(targetinfo.velocity, 'z' );
+folder = targetgui.addFolder('acceleration');
+folder.add(targetinfo.acceleration, 'x' );
+folder.add(targetinfo.acceleration, 'y' );
+folder.add(targetinfo.acceleration, 'z' );
 //监听按钮+键保存信息 相机信息和目标信息
 window.addEventListener('keydown', (event) => {
  if(event.key == '+'){
@@ -194,12 +206,12 @@ var AirPlane = function() {
   //根据速度和加速度推算飞机的下一个位置
   this.update = ()=>{
     this.propeller.rotation.x += 0.1;
-    var out_pos = new THREE.Vector3();
-    var out_vel = new THREE.Vector3();
+    //var out_pos = new THREE.Vector3();
+    //var out_vel = new THREE.Vector3();
     //todo::尝试画出圆心轨迹
-    extrapolateCircular(this.mesh.position,this.velocity,this.acceleration,1/96,out_pos,out_vel);
-    this.mesh.position.copy(out_pos);
-    this.velocity.copy(out_vel);
+    //extrapolateCircular(this.mesh.position,this.velocity,this.acceleration,1/96,out_pos,out_vel);
+    //this.mesh.position.copy(out_pos);
+    //this.velocity.copy(out_vel);
   };
   this.remove = ()=>{
     //scene.remove(this.mesh);
@@ -303,7 +315,7 @@ const material = new THREE.MeshBasicMaterial({ alpha: true,transparent:true,opac
 const cube = new THREE.Mesh(geometry, material);
 
 
-//创建飞行物
+//创建物体
 var target = airplaneManager.CreateAirPlane(new THREE.Vector3(1000,136,1000),new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0));
 
 
