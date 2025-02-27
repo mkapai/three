@@ -1,12 +1,60 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import Stats from 'three/addons/libs/stats.module.js';
-
+import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
+const gui = new GUI({title:"Settings"});
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(95, window.innerWidth / window.innerHeight, 0.1, 1000000);
 const renderer = new THREE.WebGLRenderer({alpha: true,antialias:true});
 const stats = new Stats();
 document.body.appendChild(stats.domElement);
+var myinfo = {
+  "init_velocity":1000,
+  "ballistic_coeff":-0.0001,
+  "position":new THREE.Vector3(0,0,0),
+  "velocity":new THREE.Vector3(0,0,0),
+  "direction":new THREE.Vector3(0,0,0),
+};
+var targetinfo ={
+  "position":new THREE.Vector3(0,0,0),
+  "velocity":new THREE.Vector3(0,0,0),
+  "acceleration":new THREE.Vector3(0,0,0),
+};
+var mygui = gui.addFolder('MyInfo');
+mygui.add(myinfo, 'init_velocity' );
+mygui.add(myinfo, 'ballistic_coeff');
+var folder = mygui.addFolder('Position');
+folder.add(myinfo.position, 'x' );
+folder.add(myinfo.position, 'y' );
+folder.add(myinfo.position, 'z' );
+folder = mygui.addFolder('velocity');
+folder.add(myinfo.velocity, 'x' );
+folder.add(myinfo.velocity, 'y' );
+folder.add(myinfo.velocity, 'z' );
+folder = mygui.addFolder('direction');
+folder.add(myinfo.direction, 'x' );
+folder.add(myinfo.direction, 'y' );
+folder.add(myinfo.direction, 'z' );
+var targetgui = gui.addFolder('TargetInfo');
+//监听按钮+键保存信息 相机信息和目标信息
+window.addEventListener('keydown', (event) => {
+ if(event.key == '+'){
+  var cameraState = {
+    position: camera.position.toArray(),
+    rotation: camera.rotation.toArray()
+  };
+  localStorage.setItem('cameraState', JSON.stringify(cameraState));
+  localStorage.setItem('gui', JSON.stringify(gui.save()));
+ }
+ if(event.key == '-'){
+  var cameraState = JSON.parse(localStorage.getItem('cameraState'));
+  camera.position.fromArray(cameraState.position);
+  camera.rotation.fromArray(cameraState.rotation);
+  gui.load(JSON.parse(localStorage.getItem('gui')));
+ }
+});
+
+
 
 var Colors = {
   red:0xf25346,
@@ -27,20 +75,22 @@ var Bullet = function(start_position,s_velocity,init_velocity,direction,ballisti
   this.clock = new THREE.Clock()
 
   this.mesh = new THREE.Object3D();
-  var geometry = new THREE.SphereGeometry(1, 32, 32);
+  var geometry = new THREE.SphereGeometry(5, 32, 32);
   var material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
   var bullet = new THREE.Mesh(geometry, material);
   this.mesh.add(bullet);
   this.init_position = start_position;
   this.dist = 0;
   this.mesh.position.copy(start_position);
-  direction.multiplyScalar(init_velocity);
-  this.velocity = s_velocity.clone().add(direction);
+  
+  this.velocity = s_velocity.clone().add(direction.clone().multiplyScalar(init_velocity));
   this.ballistic_coeff = ballistic_coeff;
   this.end = false;
   scene.add(this.mesh);
   //this.last_time = new Date().getTime();
   this.arrow = [];
+  this.count = 1;
+  
 
   this.UpdateProjectile = (time)=>{
     //console.log(time);
@@ -58,15 +108,21 @@ var Bullet = function(start_position,s_velocity,init_velocity,direction,ballisti
     this.dist = this.mesh.position.distanceTo(this.init_position);
 
 
-    var dir = this.velocity.clone().normalize();
-    var arrow = new THREE.ArrowHelper(
-        dir,
-        this.mesh.position.clone(),
-        5,
-        0xff00ff
-      );
-      scene.add(arrow);
-      this.arrow.push(arrow);
+    if(++this.count >10){
+      this.count = 0;
+
+      //拟合成曲线
+      var dir = this.velocity.clone().normalize();
+      
+      var arrowe = new THREE.ArrowHelper(
+          dir,
+          this.mesh.position.clone(),
+          5,
+          0xff00ff
+        );
+        scene.add(arrowe);
+        this.arrow.push(arrowe);
+    }
   };
 
   this.update = ()=>{
@@ -177,10 +233,13 @@ var BulletManager = function(){
     }
     if(e.key === "2"){
       //创建弹丸 需要一些参数 如何让用户输入?
-      this.CreateBullet(airplane.mesh.position,airplane.velocity,300,new THREE.Vector3(0.5,0.3,0.2),-0.0002);
+      //打印myinfo
+      console.log(myinfo);
+      this.CreateBullet(myinfo.position,myinfo.velocity,myinfo.init_velocity,myinfo.direction,myinfo.ballistic_coeff);
     }
   });
 };
+
 var bulletManager = new BulletManager();
 //新建一个飞机管理器,管理并更新所有飞机
 var AirPlaneManager = function(){
@@ -245,14 +304,7 @@ const cube = new THREE.Mesh(geometry, material);
 
 
 //创建飞行物
-var airplane = airplaneManager.CreateAirPlane(new THREE.Vector3(0,100,0),new THREE.Vector3(1,0,0),new THREE.Vector3(0,0,0));
-var airplane2 = airplaneManager.CreateAirPlane(new THREE.Vector3(1000,136,1000),new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0));
-airplane.mesh.scale.set(.25,.25,.25);
-airplane2.mesh.scale.set(.25,.25,.25);
-
-
-//创建弹丸
-bulletManager.CreateBullet(airplane.mesh.position,airplane.velocity,300,new THREE.Vector3(0.5,0.3,0.2),-0.0002);
+var target = airplaneManager.CreateAirPlane(new THREE.Vector3(1000,136,1000),new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0));
 
 
 
