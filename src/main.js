@@ -123,7 +123,7 @@ var Bullet = function(start_position,s_velocity,init_velocity,direction,ballisti
     this.velocity.y = this.velocity.y * adjustmentFactor + (-9.81*time);
     this.mesh.position.add(this.velocity.clone().multiplyScalar(time));
     this.dist = this.mesh.position.distanceTo(this.init_position);
-    if(++this.count >10){
+    if(++this.count >1){
       this.count = 0;
       var dir = this.velocity.clone().normalize();
       var arrowe = new THREE.ArrowHelper(
@@ -208,10 +208,28 @@ var AirPlane = function() {
   this.velocity = new THREE.Vector3();//飞机速度
   this.acceleration = new THREE.Vector3();//飞机加速度
 
+  //如何让飞机的方向指向速度方向 ???
+  this.arrowe = new THREE.ArrowHelper(
+    this.velocity.clone().normalize(),
+        this.mesh.position.clone(),
+        100,
+        0xf0f0ff
+      );
+  scene.add(this.arrowe);
+  this.update_fuzu = ()=>{
+    this.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1,0,0),this.velocity.clone().normalize());
+    this.arrowe.setDirection(this.velocity.clone().normalize());
+    this.arrowe.position.copy(this.mesh.position);
+
+
+  };
   this.update = ()=>{
+    //如何判断速度和加速度修改了
+
     this.propeller.rotation.x += 0.1;
   };
   this.remove = ()=>{
+    scene.remove(this.arrowe);
   };
   this.predicted_data = [];
   //预测位置 记录预测信息
@@ -336,8 +354,7 @@ const cube = new THREE.Mesh(geometry, material);
 var my = airplaneManager.CreateAirPlane(myinfo.position,myinfo.velocity,new THREE.Vector3());
 
 var target = airplaneManager.CreateAirPlane(targetinfo.position,targetinfo.velocity,targetinfo.acceleration);
-target.mesh.scale.set(.25,.25,.25);
-my.mesh.scale.set(.25,.25,.25);
+
 
 gui.onFinishChange(()=>{
   //配置飞机信息
@@ -348,6 +365,8 @@ gui.onFinishChange(()=>{
   my.mesh.position.copy(myinfo.position);
   my.velocity.copy(myinfo.velocity);
  
+  my.update_fuzu();
+  target.update_fuzu();
 });
 
 
@@ -424,6 +443,7 @@ window.addEventListener("keydown",(e)=>{
     var time = 0;
     bull.update_end = (ctime)=>{
       if(bull.end){
+        bull.update_end = null;
         return;
       }
 
@@ -444,11 +464,33 @@ window.addEventListener("keydown",(e)=>{
         //保证插值系数在0-1之间
         ins = Math.max(0,Math.min(1,ins));
         //插值计算弹丸到目标的位置
-        var newpos2 = newpos.position.clone().multiplyScalar(ins).add(bull.mesh.position.clone().multiplyScalar(1-ins));
+        var new_bullpos = newpos.position.clone().multiplyScalar(ins).add(bull.mesh.position.clone().multiplyScalar(1-ins));
         //插值时间
         time = time + ctime - (ins * ctime);
         //外推目标最新位置
+        var newpos1 = target.predicted(time);
+        //计算弹丸到目标的误差
+        var bull2newpos1 = new_bullpos.clone().sub(newpos1.position.clone()).lengthSq();
+        if(bull2newpos1 < 50){
+          //打印命中时间 命中位置 发射方向
+          console.log("hit!");
+          console.log("pos:",new_bullpos);
+          console.log("dir:",relative_drirection);
+          console.log("time:",time);
+          return;
+        }
+        var norbull = new_bullpos.clone().sub(my.mesh.position).normalize();
+        var nortar = newpos1.position.clone().sub(my.mesh.position).normalize();
+        //根据两个向量的夹角计算的新发射方向
+        var jiajiao = norbull.clone().dot(nortar);
+        //根据弹丸到我的方向 和 目标到我的方向 计算向量的夹角
+        //根据两个向量的夹角 调整原本的relative_drirection
         
+
+
+
+
+
         
       }
 
