@@ -448,8 +448,7 @@ window.addEventListener("keydown",(e)=>{
         //插值时间
         time = time + ctime - (ins * ctime);
         //外推目标最新位置
-        var newpos3 = target.predicted(time);
-
+        
         
       }
 
