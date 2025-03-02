@@ -13,12 +13,13 @@ var myinfo = {
   "mass":0.092,
   "caliber":0.02,
   "length":0.5678,
-  "position":new THREE.Vector3(23734.2637,2431.20166,2608.37378),
+  "position":new THREE.Vector3(0,2431.20166,0),
   "velocity":new THREE.Vector3(-7.18601704,-5.23217010,147.382675),
-  "direction":new THREE.Vector3(1,0,0),
+  "direction":new THREE.Vector3(
+    -0.145468265,-0.0115407910,0.989295602),
 };
 var targetinfo ={
-  "position":new THREE.Vector3(23457.7285,2370.69775,4528.65820),
+  "position":new THREE.Vector3(0+-276.53519,2370.69775,0+1920.28442),
   "velocity":new THREE.Vector3(43.5342674,0.563053310,-132.302429),
   "acceleration":new THREE.Vector3(-10.7967958,0.118002892,-5.90927219),
 };
@@ -52,7 +53,7 @@ folder = targetgui.addFolder('acceleration');
 folder.add(targetinfo.acceleration, 'x' ).listen();
 folder.add(targetinfo.acceleration, 'y' ).listen();
 folder.add(targetinfo.acceleration, 'z' ).listen();
-//监听按钮+键保存信息 相机信息和目标信息
+
 window.addEventListener('keydown', (event) => {
  if(event.key == '+'){
   var cameraState = {
@@ -99,12 +100,10 @@ var Bullet = function(start_position,s_velocity,init_velocity,direction,ballisti
   this.dist = 0;
   this.mesh.position.copy(start_position);
 
-  //计算弹丸3维速度 s_velocity 是载具速度 direction 是方向 init_velocity 是初速度
   this.velocity = s_velocity.clone().add(direction.clone().multiplyScalar(init_velocity));
   this.ballistic_coeff = ballistic_coeff;
   this.end = false;
   
-  //this.last_time = new Date().getTime();
   this.arrow = [];
   this.count = 1;
   this.update_end = false;
@@ -140,16 +139,13 @@ var Bullet = function(start_position,s_velocity,init_velocity,direction,ballisti
   this.update = ()=>{
     var ctime = 1/96;
     if(this.end){
-      //绘制记录点
       
       return;
     }
-    //判断当前位置的Y轴是否小于0 是就删除 运行距离是否长于1000
     if(this.mesh.position.y < 0 || this.dist > 10000){
       this.end = true;
     }
     this.UpdateProjectile(ctime);
-    //判断this.update_end是否是函数 是就调用
     if(typeof this.update_end == 'function'){
       this.update_end(ctime);  
     }
@@ -207,8 +203,8 @@ var AirPlane = function() {
   this.mesh.add(this.propeller);
   this.velocity = new THREE.Vector3();//飞机速度
   this.acceleration = new THREE.Vector3();//飞机加速度
+  this.pre_pos = [];
 
-  //如何让飞机的方向指向速度方向 ???
   this.arrowe = new THREE.ArrowHelper(
     this.velocity.clone().normalize(),
         this.mesh.position.clone(),
@@ -220,11 +216,34 @@ var AirPlane = function() {
     this.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1,0,0),this.velocity.clone().normalize());
     this.arrowe.setDirection(this.velocity.clone().normalize());
     this.arrowe.position.copy(this.mesh.position);
+    //Attempt to calculate the predicted route
+    //判断this.pre_pos是否为空 不为空则删除路径点
+    if(this.pre_pos.length > 0){
+      for(var i = 0;i<this.pre_pos.length;i++){
+        scene.remove(this.pre_pos[i]);
+      } 
+    }
+    //预测路径 96帧为一秒 预测5秒
+    for(var i = 0;i<96*5;i++){
+      var out_pos = new THREE.Vector3();
+      var out_vel = new THREE.Vector3();
+      extrapolateCircular(this.mesh.position,this.velocity,this.acceleration,1/96 * i,out_pos,out_vel);
+      var sphere = new THREE.ArrowHelper(
+        out_vel.clone().normalize(),
+        out_pos.clone(),
+        10,
+        0x00ff00
+      );
+      this.pre_pos.push(sphere);
+      scene.add(sphere);
+    }
+
+    
+
 
 
   };
   this.update = ()=>{
-    //如何判断速度和加速度修改了
 
     this.propeller.rotation.x += 0.1;
   };
@@ -232,13 +251,10 @@ var AirPlane = function() {
     scene.remove(this.arrowe);
   };
   this.predicted_data = [];
-  //预测位置 记录预测信息
   this.predicted = (time)=>{
     var out_pos = new THREE.Vector3();
     var out_vel = new THREE.Vector3();
-    //todo::尝试画出圆心轨迹
     extrapolateCircular(this.mesh.position,this.velocity,this.acceleration,time,out_pos,out_vel);
-    //记录预测的信息
     var data = {
       "position":out_pos,
       "velocity":out_vel,
@@ -248,7 +264,6 @@ var AirPlane = function() {
   };
 
 };
-//新建一个弹丸管理器,管理并更新所有弹丸
 var BulletManager = function(){
   this.bullets = [];
   this.Update = ()=>{
@@ -288,7 +303,6 @@ var BulletManager = function(){
 };
 
 var bulletManager = new BulletManager();
-//新建一个飞机管理器,管理并更新所有飞机
 var AirPlaneManager = function(){
   this.airplanes = [];
   this.Update = ()=>{
@@ -296,7 +310,6 @@ var AirPlaneManager = function(){
       this.airplanes[i].update();
     }
   };
-  //创建飞机
   this.CreateAirPlane = (position,velocity,acceleration)=>{
     var airplane = new AirPlane();
     airplane.mesh.position.copy(position);
@@ -306,7 +319,6 @@ var AirPlaneManager = function(){
     scene.add(airplane.mesh);
     return airplane;
   }
-  //删除最先创建的飞机
   this.DeleteAirPlane = ()=>{
     var air = this.airplanes.shift();
     if(air){
@@ -331,9 +343,9 @@ function createLights() {
   scene.add(ambientLight);
 }
 
-camera.position.x = 0;
-camera.position.z = 200;
-camera.position.y = 100;
+camera.position.x = 300;
+camera.position.z = 3244.3804567203774;
+camera.position.y = 2415.1817817084934;
 
 const axesHelper = new THREE.AxesHelper(15000);
 const gridHelper  = new THREE.GridHelper(15000,50);
@@ -350,14 +362,14 @@ const material = new THREE.MeshBasicMaterial({ alpha: true,transparent:true,opac
 const cube = new THREE.Mesh(geometry, material);
 
 
-//创建物体
+
 var my = airplaneManager.CreateAirPlane(myinfo.position,myinfo.velocity,new THREE.Vector3());
 
 var target = airplaneManager.CreateAirPlane(targetinfo.position,targetinfo.velocity,targetinfo.acceleration);
-
+my.update_fuzu();
+target.update_fuzu();
 
 gui.onFinishChange(()=>{
-  //配置飞机信息
   target.mesh.position.copy(targetinfo.position);
   target.velocity.copy(targetinfo.velocity);
   target.acceleration.copy(targetinfo.acceleration);
@@ -391,10 +403,8 @@ function animate() {
 }
 animate();
 
-//根据 高度获取空气阻力系数
 function getAirDensity(height) {
-  var density = 1.225; // 标准大气压下的空气密度
-  //最高海拔 18300.0
+  var density = 1.225; 
   var height_clamped = Math.min(height,18300.0);
   var polynomial = height_clamped * 2.2872e-19;
   polynomial+= -5.8356e-14;
@@ -408,18 +418,14 @@ function getAirDensity(height) {
   density /= Math.max(18300.0, height);
   return density;
 }
-//根据弹丸重量 口径 长度 计算弹丸空气阻力系数
 function getAirResistanceCoefficient(density, mass, caliber, length) {
-  // 计算弹丸的横截面积
   const crossSectionalArea = Math.pow(caliber * 0.5, 2) * Math.PI;
   
-  // 计算空气阻力系数的中间值
-  const intermediateValue = crossSectionalArea * length * density * 0.5;
+  const intermediateValue = crossSectionalArea * length * density * -0.5;
   
-  // 计算最终的空气阻力系数
   const airResistanceCoefficient = intermediateValue / mass;
   
-  return airResistanceCoefficient * -1;
+  return airResistanceCoefficient;
 }
 
 
@@ -430,7 +436,6 @@ window.addEventListener("keydown",(e)=>{
 
 
 
-    //计算目标相对位置
     var relative_pos = target.mesh.position.clone().sub(my.mesh.position);
     var relative_magnitude = relative_pos.clone().length();//相对距离
     var relative_drirection = relative_pos.clone().normalize();
@@ -438,7 +443,6 @@ window.addEventListener("keydown",(e)=>{
     
 
 
-    //创建弹丸
     var bull = bulletManager.CreateBullet(my.mesh.position,my.velocity,myinfo.init_velocity,relative_drirection,coff);
     var time = 0;
     bull.update_end = (ctime)=>{
@@ -450,29 +454,18 @@ window.addEventListener("keydown",(e)=>{
 
       time += ctime;
       var newpos = target.predicted(time);
-      //计算弹丸到我的位置的距离
       var bull_distance = bull.mesh.position.clone().sub(my.mesh.position).lengthSq();
-      //计算目标到我的位置的距离
       var target_distance = newpos.position.clone().sub(my.mesh.position).lengthSq();
-      //如果弹丸到我的位置的距离大于目标到我的位置的距离 插值计算他们距离到我的距离相等的位置
       if(bull_distance > target_distance){
         bull.end = true;
-        //计算弹丸到目标的距离
         var bull2newpos = bull.mesh.position.clone().sub(newpos.position.clone()).length();
-        //计算插值系数
         var ins = (Math.sqrt(bull_distance) - Math.sqrt(target_distance)) / bull2newpos;
-        //保证插值系数在0-1之间
         ins = Math.max(0,Math.min(1,ins));
-        //插值计算弹丸到目标的位置
         var new_bullpos = newpos.position.clone().multiplyScalar(ins).add(bull.mesh.position.clone().multiplyScalar(1-ins));
-        //插值时间
         time = time + ctime - (ins * ctime);
-        //外推目标最新位置
         var newpos1 = target.predicted(time);
-        //计算弹丸到目标的误差
         var bull2newpos1 = new_bullpos.clone().sub(newpos1.position.clone()).lengthSq();
         if(bull2newpos1 < 50){
-          //打印命中时间 命中位置 发射方向
           console.log("hit!");
           console.log("pos:",new_bullpos);
           console.log("dir:",relative_drirection);
@@ -481,10 +474,10 @@ window.addEventListener("keydown",(e)=>{
         }
         var norbull = new_bullpos.clone().sub(my.mesh.position).normalize();
         var nortar = newpos1.position.clone().sub(my.mesh.position).normalize();
-        //根据两个向量的夹角计算的新发射方向
         var jiajiao = norbull.clone().dot(nortar);
-        //根据弹丸到我的方向 和 目标到我的方向 计算向量的夹角
-        //根据两个向量的夹角 调整原本的relative_drirection
+
+
+
         
 
 
